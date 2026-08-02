@@ -1,185 +1,159 @@
 # Chladni Plate Resonance Demonstration System
 
-## Overview
+An Arduino-controlled system that converts a digitally selected excitation frequency into a visible standing-wave pattern on a metal plate, using direct digital synthesis, single-supply signal conditioning, and audio power amplification.
 
-This repository documents the design and implementation of a Chladni plate resonance demonstration system developed as an undergraduate engineering project. The system was built to visualize standing-wave mode shapes on a metal plate by converting a digitally selected electrical excitation frequency into controlled mechanical vibration.
+![Full assembled system: Arduino/DDS control circuit, LM3875 amplifier on a heatsink, the Chladni plate, and the oscilloscope used for signal verification](images/final_setup.png)
+*Full assembled system. Note: the on-image label reads "Arduino + AD9833 circuit" — this is a labeling error from the original annotation. The module used was an AD9850, consistent with the firmware, wiring schematic, and report text/references throughout this project (see [hardware-design.md](docs/hardware-design.md#dds-module-identity--ad9850-not-ad9833)).*
 
-Fine particles placed on the plate migrate toward regions of minimal motion during resonance, forming geometric nodal patterns commonly known as Chladni figures.
+## At a glance
 
-The project combines embedded control, waveform generation, analog signal conditioning, power amplification, and mechanical resonance in a single interdisciplinary system.
+| | |
+|---|---|
+| **Type** | Undergraduate electronics engineering project (team of 3) |
+| **Demonstrated** | Chladni resonance patterns at 100 Hz and 780 Hz, oscilloscope-verified |
+| **Core chain** | Arduino Uno → AD9850 DDS → signal conditioning → LM3875 power amplifier → mechanical exciter → plate |
+| **Validation method** | Qualitative (oscilloscope waveform checks + visual pattern inspection) — not calibrated modal-analysis instrumentation |
+| **Status** | Functional demonstration build, not a finished product |
 
-## Authors
+## Demonstrated result
 
-Experiment Conducted By:
+At 100 Hz the plate settled into a near-circular nodal ring; at 780 Hz it formed a distinct four-lobed pattern. Both are backed by oscilloscope captures showing the actual drive frequency at the time each photo was taken.
 
-- Aly Assaf
-- Alexey Landin
-- Abdulrahman Ahmed
+| 100 Hz | 780 Hz |
+|---|---|
+| ![Chladni pattern at 100 Hz: salt has migrated into a near-circular ring near the plate edges](images/pattern_100hz.png) | ![Chladni pattern at 780 Hz: salt has formed a four-lobed pattern with curved nodal lines converging toward the center](images/pattern_780hz.png) |
+| ![Oscilloscope trace confirming a 100 Hz sine wave, Vpp 18.5 V](images/oscilloscope_100hz.png) | ![Oscilloscope trace confirming a 780 Hz sine wave, Vpp 19.9 V](images/oscilloscope_780hz.png) |
 
-## Project Objective
+Full write-up of what these images do and don't demonstrate: [experiment-and-results.md](docs/experiment-and-results.md).
 
-To demonstrate the relationship between excitation frequency and vibration mode shape on a Chladni plate using a digitally generated sine wave, signal-conditioning circuitry, and audio power amplification.
+## System architecture
 
-## System Architecture
+```mermaid
+flowchart LR
+    A["User frequency\ninput (serial)"] --> B["Arduino Uno"]
+    B -->|"40-bit control word"| C["AD9850 DDS\n(waveform generation)"]
+    C --> D["Signal conditioning\n(AC coupling +\nmidpoint bias)"]
+    D --> E["LM3875 power\namplifier (24 V)"]
+    E --> F["Mechanical exciter\n/ speaker"]
+    F --> G["Chladni plate\nvibration"]
+    G --> H["Nodal pattern\n(visible result)"]
+```
 
-The functional signal path is:
+Full stage-by-stage breakdown, including which parts of this chain are independently verified vs. described only in the report: [system-architecture.md](docs/system-architecture.md).
 
-    Arduino Uno
-    -> AD9850 DDS Generator
-    -> Signal Conditioning Stage
-    -> LM3875 Audio Power Amplifier
-    -> Mechanical Exciter / Speaker
-    -> Metal Chladni Plate
+## How the system works
 
-The Arduino was used to set user-selected frequencies.  
-The AD9850 generated a sinusoidal waveform.  
-The signal was conditioned for compatibility with the amplifier stage.  
-The LM3875 provided sufficient output power to drive the transducer attached to the plate.
+The Arduino accepts a frequency typed into the Serial Monitor and loads it into the AD9850 as a 40-bit tuning word, which the AD9850 uses to generate a sine wave at that frequency. That signal is low-power and not correctly referenced for the amplifier, so it passes through a conditioning stage first: a 47 µF capacitor blocks the DC component, and a resistor divider re-centers the waveform on a 12 V midpoint so it stays inside the LM3875's single-supply input range. The LM3875, running from a single 24 V rail, then amplifies the conditioned signal enough to drive a mechanical exciter coupled to the plate. Near one of the plate's natural frequencies, the resulting vibration forms a standing-wave pattern: stationary **nodes** where displacement is minimal, and **antinodes** where motion is greatest. Fine salt on the plate is repeatedly displaced from the antinodes and settles along the nodal lines, making the mode shape visible.
 
-## Engineering Significance
+A sine wave — rather than a square wave, which the AD9850 also outputs — was used specifically because it concentrates energy at a single frequency, letting one vibration mode dominate instead of several harmonics exciting the plate at once.
 
-Although visually simple, the project required several practical engineering decisions.
+## Team project and my contribution
 
-### 1. Stable Frequency Generation
+This was a three-person undergraduate electronics project. **Authors:** Aly Assaf, Alexey Landin, Abdulrahman Ahmed.
 
-Resonance behavior is highly sensitive to excitation frequency. The DDS stage provided repeatable digital control over output frequency.
+The system as a whole — frequency control, DDS waveform generation, signal conditioning, power amplification, and mechanical excitation — was a collaborative team deliverable; no single person built the entire chain alone.
 
-### 2. Signal Conditioning
+**My (Abdulrahman Ahmed's) contribution:**
+- Designed and calculated the AC-coupling and midpoint-bias signal-conditioning network, from scratch.
+- Physical circuit assembly and wiring.
+- Bench inspection and testing.
+- Inspected the retained second LM3875 package and surrounding connections (see [hardware-design.md](docs/hardware-design.md#why-two-lm3875-packages-appear-in-photos)), confirming that it did not introduce unintended shorts or interfere with the active amplifier circuit.
+- Primary author of the written technical report.
 
-The source waveform required interface conditioning before amplification:
+The Arduino/AD9850 control firmware was implemented by a teammate. I did not author the firmware used during the original demonstration, though I'm comfortable reading, explaining, and extending Arduino/C++ code of this kind — see [firmware.md](docs/firmware.md) for the full protocol write-up.
 
-- DC blocking through AC coupling
-- midpoint biasing for single-supply operation
-- clean transfer into the amplifier input stage
+## Engineering decisions
 
-### 3. Power Delivery
+Adapting the LM3875's split-supply reference design for a single 24 V rail was the project's central engineering problem, solved with AC coupling plus a midpoint-bias network. Why a DDS instead of an analog oscillator, why sine instead of square, and a set of retrospective trade-offs (PCB vs. perfboard, manual vs. automated sweep, visual vs. sensor-based validation) are covered in [engineering-decisions.md](docs/engineering-decisions.md).
 
-The low-level DDS output could not directly excite the plate. A dedicated power amplifier was required to convert the signal into useful mechanical energy.
+## Hardware implementation
 
-### 4. Electromechanical Integration
+Component values (47 µF input coupling capacitor, 2× 2 kΩ bias resistors, ~1000 µF output coupling, single 24 V rail), the LM3875 datasheet reference circuit vs. the as-built single-supply circuit, and wiring photos: [hardware-design.md](docs/hardware-design.md).
 
-The final visible result depended not only on electronics, but also on plate geometry, mounting method, exciter coupling, and particle distribution.
+![LM3875 amplifier circuit mounted to its heatsink, next to the Chladni plate speaker](images/Heatsink_and_LM3875_circuit.jpg)
 
-## Chladni Plate Theory
+## Firmware implementation
 
-When a plate is driven near one of its natural frequencies, standing-wave modes are formed.
+Serial workflow, AD9850 pin assignments, the 40-bit control word and frequency tuning-word equation, and known limitations of the code in this repository (which is a **documentation reconstruction**, not the original experimental firmware): [firmware.md](docs/firmware.md).
 
-These modes contain:
+## Experimental procedure
 
-- **Nodes**: regions of minimal displacement
-- **Antinodes**: regions of maximum displacement
+Plate preparation, frequency selection, and how resonance was located visually rather than with instrumentation: [experiment-and-results.md](docs/experiment-and-results.md).
 
-Particles move away from vibrating antinodal regions and settle along nodal lines, revealing the mode shape.
+## Results and evidence
 
-Different frequencies excite different patterns.
+Oscilloscope readings, pattern photos, and an explicit breakdown of what was validated vs. what remains qualitative-only: [experiment-and-results.md](docs/experiment-and-results.md).
 
-## Hardware Used
+## Skills demonstrated
 
-- Arduino Uno
-- AD9850 DDS signal generator module
-- LM3875 audio power amplifier
-- Bench DC power supply
-- Oscilloscope
-- Perfboard prototype circuit
-- Mechanical exciter or speaker
-- Metal plate
-- Sand or fine particles for visualization
+- **Analog signal conditioning** — designing and calculating an AC-coupling/midpoint-bias network to interface a digital waveform source with a single-supply amplifier (report §6, [hardware-design.md](docs/hardware-design.md)).
+- **Power amplification integration** — adapting a split-supply datasheet reference design (LM3875) to a single-rail system.
+- **Electromechanical system integration** — connecting an amplifier output to a mechanical exciter and reasoning about the full electrical-to-mechanical energy path ([system-architecture.md](docs/system-architecture.md)).
+- **Circuit inspection and debugging** — checking the retained LM3875 package and surrounding perfboard connections for unintended shorts or interference before system operation ([hardware-design.md](docs/hardware-design.md#why-two-lm3875-packages-appear-in-photos)).
+- **Oscilloscope-based verification** — confirming frequency and amplitude at each demonstrated operating point ([experiment-and-results.md](docs/experiment-and-results.md)).
+- **Technical documentation** — authoring the written project report, with calculations and cited references.
+- **Collaborative engineering** — integrating individually-built subsystems (firmware, circuit, mechanical assembly) into one working system with teammates.
 
-## Repository Structure
+## Project scope
 
-    chladni-plate-resonance-system/
-    ├── README.md
-    ├── report/
-    │   └── Chladni Plate Report.pdf
-    ├── code/
-    │   └── arduino_frequency_controller.ino
-    ├── images/
-    │   ├── final_setup.jpg
-    │   ├── pattern_100hz.jpg
-    │   ├── pattern_780hz.jpg
-    │   ├── oscilloscope_100hz.jpg
-    │   └── oscilloscope_780hz.jpg
-    ├── schematics/
-    │   ├── lm3875_typical_application.png
-    │   ├── lm3875_single_supply_biasing.png
-    │   └── arduino_ad9850_wiring.png
-    └── docs/
-        └── design_notes.md
+Built and evaluated as a functional demonstration, not a calibrated measurement instrument — no automated sweep logging, quantified vibration amplitude, or modal-simulation comparison exists for this build. Full scope and current limitations: [project-scope-and-next-steps.md](docs/project-scope-and-next-steps.md).
 
-## Included Documentation
+## Next engineering iteration
 
-### Full Technical Report
+Planned/possible follow-on work — automated sweep mode, sensor-based amplitude measurement, PCB revision, frequency display — is listed in [project-scope-and-next-steps.md](docs/project-scope-and-next-steps.md).
 
-Located in the `report/` folder.
+## Repository structure
 
-This document contains:
+```
+.
+├── README.md
+├── LICENSE                  # see License status below — not a single uniform license
+├── docs/
+│   ├── system-architecture.md
+│   ├── hardware-design.md
+│   ├── firmware.md
+│   ├── experiment-and-results.md
+│   ├── engineering-decisions.md
+│   ├── project-scope-and-next-steps.md
+│   └── design_notes.md      # original project design notes
+├── code/
+│   └── arduino_frequency_controller.ino
+├── images/
+│   ├── final_setup.png
+│   ├── pattern_100hz.png
+│   ├── pattern_780hz.png
+│   ├── oscilloscope_100hz.png
+│   ├── oscilloscope_780hz.png
+│   ├── Arduino_and_AD9850_connections.jpg
+│   ├── Heatsink_and_LM3875_circuit.jpg
+│   └── output_coupling_capacitors.jpg
+├── schematics/
+│   ├── arduino_ad9850_wiring.jpeg
+│   └── lm3875_typical_application.png   # LM3875 datasheet reference circuit, not the as-built circuit
+└── report/
+    └── Chladni Plate Report.pdf
+```
 
-- project motivation
-- theory of resonance and Chladni figures
-- circuit design explanation
-- signal-conditioning calculations
-- implementation notes
-- demonstration results
+## Documentation links
 
-### Arduino Control Code
+- [System Architecture](docs/system-architecture.md)
+- [Hardware Design](docs/hardware-design.md)
+- [Firmware](docs/firmware.md)
+- [Experiment and Results](docs/experiment-and-results.md)
+- [Engineering Decisions](docs/engineering-decisions.md)
+- [Project Scope and Next Steps](docs/project-scope-and-next-steps.md)
+- [Design Notes](docs/design_notes.md) — original narrative design reasoning
+- [Full Technical Report (PDF)](report/Chladni%20Plate%20Report.pdf)
 
-Located in the `code/` folder.
+## Authors and attribution
 
-This file contains the Arduino program used to control the AD9850 and set user-selected frequencies.
+**Project team:** Aly Assaf, Alexey Landin, Abdulrahman Ahmed — Electronics Engineering Project, 2026.
 
-### Design Notes
+- `schematics/lm3875_typical_application.png` is reproduced from the LM3875 Overture Audio Power Amplifier datasheet (National Semiconductor / Texas Instruments, Rev. E, 2013) for reference — see [LICENSE](LICENSE) for how this is excluded from the repository's license.
+- Full reference list, including the AD9850 datasheet (Analog Devices, Rev. E, 2012) and academic sources on Chladni figures, is in the [project report](report/Chladni%20Plate%20Report.pdf)'s References section.
 
-Located in the `docs/` folder.
+## License status
 
-This file explains the engineering reasoning behind the architecture, with emphasis on frequency generation, single-supply biasing, signal conditioning, and system-level design choices.
-
-## Results
-
-The completed system successfully generated visible Chladni patterns when operated near resonant frequencies of the plate.
-
-Observed behavior included:
-
-- distinct nodal line formation
-- changing pattern geometry with frequency
-- stable excitation using sinusoidal drive
-- successful interaction between digital control and analog power stages
-
-This project was conducted as a demonstration build rather than a precision measurement experiment. No formal modal analysis or calibrated vibration data were recorded.
-
-## Limitations
-
-The prototype did not include:
-
-- automated frequency sweep logging
-- quantified vibration amplitude measurements
-- PCB-based final hardware design
-- closed-loop resonance detection
-- modal simulation software comparison
-
-## Future Improvements
-
-Potential future developments include:
-
-- digital frequency display
-- automated sweep mode
-- PCB redesign of amplifier stage
-- preset resonance frequencies
-- comparison of different plate geometries
-- structured catalog of measured mode patterns
-
-## Academic Value
-
-This project demonstrates the integration of multiple engineering domains:
-
-- Embedded Systems
-- Signal Processing
-- Analog Electronics
-- Power Amplification
-- Mechanical Vibrations
-- Experimental Demonstration Methods
-
-It serves as a practical example of how electronic systems can be used to make abstract physical phenomena directly observable.
-
-## License
-
-This repository is shared for educational and documentation purposes.
+- **Firmware** (`code/`): no explicit license currently granted. This file is a documentation reconstruction (see [firmware.md](docs/firmware.md)), and authorship/ownership of the reconstruction itself hasn't been settled, so it remains under default copyright for now — see [LICENSE](LICENSE).
+- **Documentation, report, and original photos** (`docs/`, `report/`, `images/`, README): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — the project team has confirmed all members are willing to license this material openly. Attribute the project team (Aly Assaf, Alexey Landin, Abdulrahman Ahmed) when reusing.
+- **`schematics/lm3875_typical_application.png`** is a manufacturer datasheet figure, reproduced for reference only, and is **not** covered by the above license — see [LICENSE](LICENSE) for the full carve-out.

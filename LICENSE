@@ -1,0 +1,44 @@
+This repository does not use a single, uniform license. Different parts of the
+repository are covered differently, as described below.
+
+====================================================================
+1. Firmware code (everything under `code/`) — NO EXPLICIT LICENSE
+====================================================================
+
+The firmware in `code/` is a reconstruction written for documentation
+purposes (see its own header comment and docs/firmware.md); it is not the
+original code that ran during the project's demonstration. Authorship and
+ownership of this specific reconstructed file have not been confirmed, so no
+explicit license is granted for it here. It remains under default copyright
+("all rights reserved") until that is clarified. If you are one of the
+project authors and want to license this file, update this section once
+authorship is settled.
+
+====================================================================
+2. Documentation, report, and original photos
+   (README.md, everything under docs/, report/, and images/,
+   EXCEPT the file listed in section 3 below)
+====================================================================
+
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+Copyright (c) 2026 Aly Assaf, Alexey Landin, Abdulrahman Ahmed
+
+The project team has confirmed that all team members are willing to license
+this material openly. You are free to share and adapt this material for any
+purpose, provided you give appropriate credit to the project team (Aly
+Assaf, Alexey Landin, Abdulrahman Ahmed), provide a link to the license, and
+indicate if changes were made.
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+====================================================================
+3. Excluded: third-party datasheet figure
+====================================================================
+
+`schematics/lm3875_typical_application.png` is reproduced from the LM3875
+Overture Audio Power Amplifier Series datasheet (National Semiconductor /
+Texas Instruments, Rev. E, 2013). This figure is NOT covered by the license
+above. It is included in this repository for reference/citation purposes
+only, under the original manufacturer's copyright. Consult the current
+LM3875 datasheet from Texas Instruments for terms governing reuse of this
+figure.
